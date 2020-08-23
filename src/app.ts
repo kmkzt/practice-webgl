@@ -4,9 +4,25 @@ import fsSource from './color.frag'
 // Vertex shader program
 import vsSource from './square.vert'
 
-//
-// Start here
-//
+interface ProgramInfo {
+  program: WebGLProgram
+  attribLocations: {
+    [key: string]: number
+  }
+  uniformLocations: {
+    [key: string]: WebGLUniformLocation | null
+  }
+}
+
+interface Buffers {
+  [key: string]: WebGLBuffer | null
+}
+
+/**
+ * PARAMETER
+ */
+let squareRotation = 0
+
 function main() {
   const canvas = document.getElementById('app') as HTMLCanvasElement
   const gl = canvas.getContext('webgl2')
@@ -15,23 +31,20 @@ function main() {
 
   if (!gl) {
     console.error(
-      'Unable to initialize WebGL. Your browser or machine may not support it.'
+      '[ERROR] Unable to initialize WebGL. Your browser or machine may not support it.'
     )
     return
   }
-  // Initialize a shader program; this is where all the lighting
-  // for the vertices and so forth is established.
   const shaderProgram = initShaderProgram(gl, vsSource, fsSource)
-
   if (!shaderProgram) {
-    console.error('[ERROR]  initShaderProgram')
+    console.error('[ERROR] initShaderProgram')
     return
   }
   // Collect all the info needed to use the shader program.
   // Look up which attributes our shader program is using
   // for aVertexPosition, aVevrtexColor and also
   // look up uniform locations.
-  const programInfo = {
+  const programInfo: ProgramInfo = {
     program: shaderProgram,
     attribLocations: {
       vertexPosition: gl.getAttribLocation(shaderProgram, 'aVertexPosition'),
@@ -50,8 +63,22 @@ function main() {
   // objects we'll be drawing.
   const buffers = initBuffers(gl)
 
-  // Draw the scene
-  drawScene(gl, programInfo, buffers)
+  // Static Rnder
+  let then = 0
+  // Static Rnder
+  // drawScene(gl, programInfo, buffers, then)
+
+  // Animation
+  const render = (now: number) => {
+    now *= 0.001 // convert to seconds
+    const deltaTime = now - then
+    then = now
+
+    drawScene(gl, programInfo, buffers, deltaTime)
+
+    requestAnimationFrame(render)
+  }
+  requestAnimationFrame(render)
 }
 
 //
@@ -60,7 +87,7 @@ function main() {
 // Initialize the buffers we'll need. For this demo, we just
 // have one object -- a simple two-dimensional square.
 //
-function initBuffers(gl: WebGLRenderingContext) {
+function initBuffers(gl: WebGLRenderingContext): Buffers {
   // Create a buffer for the square's positions.
 
   const positionBuffer = gl.createBuffer()
@@ -117,7 +144,12 @@ function initBuffers(gl: WebGLRenderingContext) {
 //
 // Draw the scene.
 //
-function drawScene(gl: WebGLRenderingContext, programInfo: any, buffers: any) {
+function drawScene(
+  gl: WebGLRenderingContext,
+  programInfo: ProgramInfo,
+  buffers: Buffers,
+  deltaTime: number
+) {
   gl.clearColor(0.0, 0.0, 0.0, 1.0) // Clear to black, fully opaque
   gl.clearDepth(1.0) // Clear everything
   gl.enable(gl.DEPTH_TEST) // Enable depth testing
@@ -160,6 +192,13 @@ function drawScene(gl: WebGLRenderingContext, programInfo: any, buffers: any) {
     [-0.0, 0.0, -6.0]
   ) // amount to translate
 
+  mat4.rotate(
+    modelViewMatrix, // destination matrix
+    modelViewMatrix, // matrix to rotate
+    squareRotation, // amount to rotate in radians
+    [0, 0, 1]
+  ) // axis to rotate around
+
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute
   {
@@ -201,11 +240,9 @@ function drawScene(gl: WebGLRenderingContext, programInfo: any, buffers: any) {
   }
 
   // Tell WebGL to use our program when drawing
-
   gl.useProgram(programInfo.program)
 
   // Set the shader uniforms
-
   gl.uniformMatrix4fv(
     programInfo.uniformLocations.projectionMatrix,
     false,
@@ -222,6 +259,9 @@ function drawScene(gl: WebGLRenderingContext, programInfo: any, buffers: any) {
     const vertexCount = 4
     gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount)
   }
+
+  // Upadte rotation
+  squareRotation += deltaTime
 }
 
 //
@@ -236,7 +276,7 @@ function initShaderProgram(
   const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fsSource)
 
   if (!vertexShader || !fragmentShader) {
-    console.error('[ERROR] loadShader error/')
+    console.error('[ERROR] loadShader error.')
     return null
   }
   // Create the shader program
