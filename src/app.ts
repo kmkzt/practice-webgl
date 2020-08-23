@@ -1,8 +1,8 @@
 import { mat4 } from 'gl-matrix'
-// Fragment shader program
-import fsSource from './color.frag'
 // Vertex shader program
-import vsSource from './square.vert'
+import vsSource from './model.vert'
+// Fragment shader program
+import fsSource from './texture.frag'
 
 interface ProgramInfo {
   program: WebGLProgram
@@ -21,14 +21,11 @@ interface Buffers {
 /**
  * PARAMETER
  */
-let squareRotation = 0
+let cubeRotation = 20
 
 function main() {
   const canvas = document.getElementById('app') as HTMLCanvasElement
   const gl = canvas.getContext('webgl2')
-
-  // If we don't have a GL context, give up now
-
   if (!gl) {
     console.error(
       '[ERROR] Unable to initialize WebGL. Your browser or machine may not support it.'
@@ -40,10 +37,7 @@ function main() {
     console.error('[ERROR] initShaderProgram')
     return
   }
-  // Collect all the info needed to use the shader program.
-  // Look up which attributes our shader program is using
-  // for aVertexPosition, aVevrtexColor and also
-  // look up uniform locations.
+
   const programInfo: ProgramInfo = {
     program: shaderProgram,
     attribLocations: {
@@ -59,16 +53,13 @@ function main() {
     }
   }
 
-  // Here's where we call the routine that builds all the
-  // objects we'll be drawing.
   const buffers = initBuffers(gl)
 
-  // Static Rnder
-  let then = 0
-  // Static Rnder
-  // drawScene(gl, programInfo, buffers, then)
+  // Static Render
+  // drawScene(gl, programInfo, buffers, 0)
 
   // Animation
+  let then = 0
   const render = (now: number) => {
     now *= 0.001 // convert to seconds
     const deltaTime = now - then
@@ -81,63 +72,187 @@ function main() {
   requestAnimationFrame(render)
 }
 
-//
-// initBuffers
-//
-// Initialize the buffers we'll need. For this demo, we just
-// have one object -- a simple two-dimensional square.
-//
+const setupBuffer = (
+  gl: WebGLRenderingContext,
+  {
+    data,
+    target,
+    usage
+  }: { data: Float32Array | Uint16Array; target: number; usage?: number }
+): WebGLBuffer | null => {
+  const buf = gl.createBuffer()
+  gl.bindBuffer(target, buf)
+  gl.bufferData(target, data, usage || gl.STATIC_DRAW)
+  return buf
+}
+
 function initBuffers(gl: WebGLRenderingContext): Buffers {
-  // Create a buffer for the square's positions.
+  const positions = [
+    // Front face
+    -1.0,
+    -1.0,
+    1.0,
+    1.0,
+    -1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    -1.0,
+    1.0,
+    1.0,
 
-  const positionBuffer = gl.createBuffer()
+    // Back face
+    -1.0,
+    -1.0,
+    -1.0,
+    -1.0,
+    1.0,
+    -1.0,
+    1.0,
+    1.0,
+    -1.0,
+    1.0,
+    -1.0,
+    -1.0,
 
-  // Select the positionBuffer as the one to apply buffer
-  // operations to from here out.
+    // Top face
+    -1.0,
+    1.0,
+    -1.0,
+    -1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    -1.0,
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer)
+    // Bottom face
+    -1.0,
+    -1.0,
+    -1.0,
+    1.0,
+    -1.0,
+    -1.0,
+    1.0,
+    -1.0,
+    1.0,
+    -1.0,
+    -1.0,
+    1.0,
 
-  // Now create an array of positions for the square.
-  const positions = [1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0]
+    // Right face
+    1.0,
+    -1.0,
+    -1.0,
+    1.0,
+    1.0,
+    -1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    -1.0,
+    1.0,
 
-  // Now pass the list of positions into WebGL to build the
-  // shape. We do this by creating a Float32Array from the
-  // JavaScript array, then use it to fill the current buffer.
-
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW)
-
-  // Now set up the colors for the vertices
-
-  const colors = [
-    // white
+    // Left face
+    -1.0,
+    -1.0,
+    -1.0,
+    -1.0,
+    -1.0,
+    1.0,
+    -1.0,
     1.0,
     1.0,
+    -1.0,
     1.0,
-    1.0,
-    // red
-    1.0,
-    0.0,
-    0.0,
-    1.0,
-    // green
-    0.0,
-    1.0,
-    0.0,
-    1.0,
-    // blue
-    0.0,
-    0.0,
-    1.0,
-    1.0
+    -1.0
   ]
 
-  const colorBuffer = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer)
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW)
+  // Now set up the colors for the vertices
+  const faceColors = [
+    [1.0, 1.0, 1.0, 1.0], // Front face: white
+    [1.0, 0.0, 0.0, 1.0], // Back face: red
+    [0.0, 1.0, 0.0, 1.0], // Top face: green
+    [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
+    [1.0, 1.0, 0.0, 1.0], // Right face: yellow
+    [1.0, 0.0, 1.0, 1.0] // Left face: purple
+  ]
+
+  // Convert the array of colors into a table for all the vertices.
+  let colors: number[] = []
+  for (let j = 0; j < faceColors.length; ++j) {
+    const c = faceColors[j]
+
+    // Repeat each color four times for the four vertices of the face
+    colors = colors.concat(c, c, c, c)
+  }
+
+  // This array defines each face as two triangles, using the
+  // indices into the vertex array to specify each triangle's
+  // position.
+  const indices = [
+    // front
+    0,
+    1,
+    2,
+    0,
+    2,
+    3,
+    // back
+    4,
+    5,
+    6,
+    4,
+    6,
+    7,
+    // top
+    8,
+    9,
+    10,
+    8,
+    10,
+    11,
+    // bottom
+    12,
+    13,
+    14,
+    12,
+    14,
+    15,
+    // right
+    16,
+    17,
+    18,
+    16,
+    18,
+    19,
+    // left
+    20,
+    21,
+    22,
+    20,
+    22,
+    23
+  ]
 
   return {
-    position: positionBuffer,
-    color: colorBuffer
+    position: setupBuffer(gl, {
+      data: new Float32Array(positions),
+      target: gl.ARRAY_BUFFER
+    }),
+    color: setupBuffer(gl, {
+      data: new Float32Array(colors),
+      target: gl.ARRAY_BUFFER
+    }),
+    indices: setupBuffer(gl, {
+      data: new Uint16Array(indices),
+      target: gl.ELEMENT_ARRAY_BUFFER
+    })
   }
 }
 
@@ -156,7 +271,6 @@ function drawScene(
   gl.depthFunc(gl.LEQUAL) // Near things obscure far things
 
   // Clear the canvas before we start drawing on it.
-
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
   // Create a perspective matrix, a special matrix that is
@@ -195,14 +309,21 @@ function drawScene(
   mat4.rotate(
     modelViewMatrix, // destination matrix
     modelViewMatrix, // matrix to rotate
-    squareRotation, // amount to rotate in radians
+    cubeRotation, // amount to rotate in radians
     [0, 0, 1]
-  ) // axis to rotate around
+  ) // axis to rotate around (Z)
+
+  mat4.rotate(
+    modelViewMatrix, // destination matrix
+    modelViewMatrix, // matrix to rotate
+    cubeRotation * 0.7, // amount to rotate in radians
+    [0, 1, 0]
+  ) // axis to rotate around (X)
 
   // Tell WebGL how to pull out the positions from the position
   // buffer into the vertexPosition attribute
   {
-    const numComponents = 2
+    const numComponents = 3
     const type = gl.FLOAT
     const normalize = false
     const stride = 0
@@ -239,6 +360,9 @@ function drawScene(
     gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor)
   }
 
+  // Tell WebGL which indices to use to index the vertices
+  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices)
+
   // Tell WebGL to use our program when drawing
   gl.useProgram(programInfo.program)
 
@@ -255,13 +379,14 @@ function drawScene(
   )
 
   {
+    const vertexCount = 36
+    const type = gl.UNSIGNED_SHORT
     const offset = 0
-    const vertexCount = 4
-    gl.drawArrays(gl.TRIANGLE_STRIP, offset, vertexCount)
+    gl.drawElements(gl.TRIANGLES, vertexCount, type, offset)
   }
 
-  // Upadte rotation
-  squareRotation += deltaTime
+  // Update the rotation for the next draw
+  cubeRotation += deltaTime
 }
 
 //
@@ -282,7 +407,7 @@ function initShaderProgram(
   // Create the shader program
   const shaderProgram = gl.createProgram()
   if (!shaderProgram) {
-    console.error('[ERROR] shaderProgram is null.')
+    console.error('[ERROR] Unable to gl.crateProgram() ')
     return null
   }
   gl.attachShader(shaderProgram, vertexShader)
@@ -293,7 +418,7 @@ function initShaderProgram(
 
   if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
     console.error(
-      'Unable to initialize the shader program: ' +
+      '[ERROR] Unable to initialize the shader program: ' +
         gl.getProgramInfoLog(shaderProgram)
     )
     return null
