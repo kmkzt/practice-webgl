@@ -83,6 +83,7 @@ const setupBuffer = (
   const buf = gl.createBuffer()
   gl.bindBuffer(target, buf)
   gl.bufferData(target, data, usage || gl.STATIC_DRAW)
+  gl.bindBuffer(target, null)
   return buf
 }
 
