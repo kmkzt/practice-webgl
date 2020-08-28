@@ -4,7 +4,6 @@
     "outDir": "./lib",
     "target": "esnext",
     "module": "esnext",
-    "lib": ["es2018", "es2017", "dom"],
     "jsx": "react",
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
