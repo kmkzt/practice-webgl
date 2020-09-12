@@ -3,6 +3,14 @@ import { mat4 } from 'gl-matrix'
 // import vsSource from './model.vert'
 // import fsSource from './texture.frag'
 
+import { createRandomColors } from './colors'
+import { createIndices } from './indices'
+
+// import parseSTL from './loader.js'
+// @ts-ignore
+// import bunny from 'raw-loader!./stl/bunny.stl' // eslint-disable-line
+// import stlModel from 'raw-loader!./stl/cube.stl' // eslint-disable-line
+
 interface ProgramInfo {
   program: WebGLProgram
   attribLocations: {
@@ -22,10 +30,51 @@ interface ModelObject {
   }
 }
 
+const createModelObject = (
+  gl: WebGLRenderingContext,
+  pos: Float32Array,
+  cols: Float32Array
+): ModelObject => {
+  const createVBO = (
+    gl: WebGLRenderingContext,
+    data: Float32Array
+  ): WebGLBuffer | null => {
+    const buf = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf)
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW)
+    gl.bindBuffer(gl.ARRAY_BUFFER, null)
+    return buf
+  }
+
+  const createIBO = (
+    gl: WebGLRenderingContext,
+    data: Uint16Array
+  ): WebGLBuffer | null => {
+    const buf = gl.createBuffer()
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf)
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data, gl.STATIC_DRAW)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+    return buf
+  }
+  const indices = createIndices(pos.length)
+  return {
+    model: createVBO(gl, pos),
+    // position2: createVBO(gl, positions2),
+    texture: createVBO(
+      gl,
+      cols || createRandomColors(indices[indices.length - 1] + 1)
+    ),
+    draw: {
+      buffer: createIBO(gl, indices),
+      count: indices.length
+    }
+  }
+}
+
 /**
  * Object
  */
-const cube = [
+const EXAMPLE_CUBE = [
   // Front face
   [-1.0, -1.0, 1.0],
   [1.0, -1.0, 1.0],
@@ -57,51 +106,7 @@ const cube = [
   [-1.0, 1.0, 1.0],
   [-1.0, 1.0, -1.0]
 ]
-const positions = new Float32Array(cube.flat(Infinity))
-// Multiple Render Test
-const positions2 = new Float32Array(
-  cube.map(c => [c[0] - 2, c[1] - 2, c[2] - 2]).flat(Infinity)
-)
 
-// Now set up the colors for the vertices
-const colors = new Float32Array(
-  [
-    [1.0, 1.0, 1.0, 1.0], // Front face: white
-    [1.0, 0.0, 0.0, 1.0], // Back face: red
-    [0.0, 1.0, 0.0, 1.0], // Top face: green
-    [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
-    [1.0, 1.0, 0.0, 1.0], // Right face: yellow
-    [1.0, 0.0, 1.0, 1.0] // Left face: purple
-  ]
-    .map(c => [c, c, c, c])
-    .flat(Infinity)
-)
-
-// This array defines each face as two triangles, using the
-// indices into the vertex array to specify each triangle's
-// position.
-const indices = new Uint16Array(
-  [
-    // front
-    [0, 1, 2],
-    [0, 2, 3],
-    // back
-    [4, 5, 6],
-    [4, 6, 7],
-    // top
-    [8, 9, 10],
-    [8, 10, 11],
-    // bottom
-    [12, 13, 14],
-    [12, 14, 15],
-    // right
-    [16, 17, 18],
-    [16, 18, 19],
-    // left
-    [20, 21, 22],
-    [20, 22, 23]
-  ].flat(Infinity)
-)
 /**
  * PARAMETER
  */
@@ -158,25 +163,29 @@ function main() {
     }
   }
 
-  const cube: ModelObject = {
-    model: createVBO(gl, positions),
-    // position2: createVBO(gl, positions2),
-    texture: createVBO(gl, colors),
-    draw: {
-      buffer: createIBO(gl, indices),
-      count: indices.length
-    }
-  }
+  const cube: ModelObject = createModelObject(
+    gl,
+    new Float32Array(EXAMPLE_CUBE.flat(Infinity)),
+    new Float32Array(
+      [
+        [1.0, 1.0, 1.0, 1.0], // Front face: white
+        [1.0, 0.0, 0.0, 1.0], // Back face: red
+        [0.0, 1.0, 0.0, 1.0], // Top face: green
+        [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
+        [1.0, 1.0, 0.0, 1.0], // Right face: yellow
+        [1.0, 0.0, 1.0, 1.0] // Left face: purple
+      ]
+        .map(c => [c, c, c, c])
+        .flat(Infinity)
+    )
+  )
 
-  const cube2: ModelObject = {
-    model: createVBO(gl, positions2),
-    // position2: createVBO(gl, positions2),
-    texture: createVBO(gl, colors),
-    draw: {
-      buffer: createIBO(gl, indices),
-      count: indices.length
-    }
-  }
+  const cube2: ModelObject = createModelObject(
+    gl,
+    new Float32Array(
+      EXAMPLE_CUBE.map(c => [c[0] - 2, c[1] - 2, c[2] - 2]).flat(Infinity)
+    )
+  )
 
   // Static Render
   // drawScene(gl, programInfo, buffers, 0)
@@ -194,27 +203,6 @@ function main() {
     requestAnimationFrame(render)
   }
   requestAnimationFrame(render)
-}
-const createVBO = (
-  gl: WebGLRenderingContext,
-  data: Float32Array
-): WebGLBuffer | null => {
-  const buf = gl.createBuffer()
-  gl.bindBuffer(gl.ARRAY_BUFFER, buf)
-  gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ARRAY_BUFFER, null)
-  return buf
-}
-
-const createIBO = (
-  gl: WebGLRenderingContext,
-  data: Uint16Array
-): WebGLBuffer | null => {
-  const buf = gl.createBuffer()
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buf)
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data, gl.STATIC_DRAW)
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
-  return buf
 }
 //
 // Draw the scene.
