@@ -5,11 +5,12 @@ import { mat4 } from 'gl-matrix'
 
 import { createRandomColors } from './colors'
 import { createIndices } from './indices'
-
-// import parseSTL from './loader.js'
 // @ts-ignore
-// import bunny from 'raw-loader!./stl/bunny.stl' // eslint-disable-line
-// import stlModel from 'raw-loader!./stl/cube.stl' // eslint-disable-line
+import parseSTL from './loader.js'
+
+// @ts-ignore
+// import stlModel from 'raw-loader!./stl/eiffel.stl' // eslint-disable-line
+import stlModel from 'raw-loader!./stl/cube.stl' // eslint-disable-line
 
 interface ProgramInfo {
   program: WebGLProgram
@@ -33,8 +34,10 @@ interface ModelObject {
 const createModelObject = (
   gl: WebGLRenderingContext,
   pos: Float32Array,
-  cols: Float32Array
+  cols?: Float32Array
 ): ModelObject => {
+  console.log(pos, cols)
+
   const createVBO = (
     gl: WebGLRenderingContext,
     data: Float32Array
@@ -57,13 +60,12 @@ const createModelObject = (
     return buf
   }
   const indices = createIndices(pos.length)
+  const colors = cols || createRandomColors(indices[indices.length - 1] + 1)
+  console.log(pos, indices, cols)
   return {
     model: createVBO(gl, pos),
     // position2: createVBO(gl, positions2),
-    texture: createVBO(
-      gl,
-      cols || createRandomColors(indices[indices.length - 1] + 1)
-    ),
+    texture: createVBO(gl, colors),
     draw: {
       buffer: createIBO(gl, indices),
       count: indices.length
@@ -110,7 +112,7 @@ const EXAMPLE_CUBE = [
 /**
  * PARAMETER
  */
-let cubeRotation = 20
+let cubeRotation = 0
 
 function main() {
   const canvas = document.getElementById('app') as HTMLCanvasElement
@@ -180,11 +182,15 @@ function main() {
     )
   )
 
+  const formatNum = (p: number): number => (p >> 32) / 20 - 2
+  // const formatNum = (p: number): number => p
+
   const cube2: ModelObject = createModelObject(
     gl,
-    new Float32Array(
-      EXAMPLE_CUBE.map(c => [c[0] - 2, c[1] - 2, c[2] - 2]).flat(Infinity)
-    )
+    // new Float32Array(
+    //   EXAMPLE_CUBE.map(c => [c[0] - 2, c[1] - 2, c[2] - 2]).flat(Infinity)
+    // )
+    new Float32Array(parseSTL(stlModel).vertices.map(formatNum))
   )
 
   // Static Render
